@@ -1,8 +1,8 @@
 use std::fmt;
 
-// Stores piece types types to check moves/representation
+// Chess pieces for use in game logic and display
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Piece {
+pub enum Piece {
     King,
     Queen,
     Rook,
@@ -119,7 +119,7 @@ impl Piece {
         let own_color = game.get_color_at(usize::try_from(x).unwrap(), usize::try_from(y).unwrap()).unwrap();
         let mut possible_moves = vec![(-1, -1)]; // Initialize possible moves to something that will get culled
 
-        for i in 0..8 {
+        for _i in 0..8 {
             x += step_x;
             y += step_y;
 
@@ -147,24 +147,24 @@ impl Piece {
 // Game states
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum GameState {
-    InProgress, // State during normal gameplay, allow any move
-    Check, // King is in check, move out of check should be forced
-    GameOver, // Game has ended due to checkmate/resignation, further play disallowed
-    Checkmate // Checkmate, award a win and end the game
+    InProgress, // State during normal gameplay
+    Check, // King is in check
+    GameOver, // Game has ended due to resignation/stalemate, further play disallowed *NOT USED*
+    Checkmate // Checkmate, further play disallowed
 }
 
+// Colors for use in movement, turn-taking and display logic
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-enum Color {
+pub enum Color {
     Black,
     White
 }
 
-// Stores game state including:
-// Game board with pieces and colors
-// Player to move
 pub struct Game {
+    // The board stored as a 2D matrix. Access a square with self.board[y][x], with the origin at the top left corner
+    // Empty squares are represented by None, occupied squares by Some(Piece)
     board: [[Option<Piece>; 8]; 8],
-    black: u64, // Positions of black pieces as a bitmap
+    black: u64, // Positions of black pieces as a bitboard
     white: u64, // And the same for white pieces
     state: GameState,
     player: Color, // The player to move
@@ -221,7 +221,7 @@ impl Game {
             return None;
         }
         // We now know that the move is legal, proceed from there
-        self.move_piece(numerical_from.0, numerical_from.0, numerical_to.0, numerical_to.1);
+        self.move_piece(numerical_from.0, numerical_from.1, numerical_to.0, numerical_to.1);
         let opponent = get_opposite_color(self.player);
         if self.is_in_check(opponent) {
             if self.has_no_moves(opponent) {
@@ -311,14 +311,14 @@ impl Game {
             }
         }
         all_opponent_moves.swap_remove(0); // Trim initialization value
-        return all_opponent_moves.contains(&self.find_king(&color))
+        return all_opponent_moves.contains(&self.find_king(color))
     }
 
-    // Returns the coordinates of the king of the specified color
-    fn find_king(&self, color: &Color) -> (usize, usize) {
+    // Returns the numerical coordinates of the king of the given color
+    fn find_king(&self, color: Color) -> (usize, usize) {
         for y in 0..8 {
             for x in 0..8 {
-                if self.board[y][x] == Some(Piece::King) && self.get_color_at(x, y) == Some(*color) {
+                if self.board[y][x] == Some(Piece::King) && self.get_color_at(x, y) == Some(color) {
                     return (x, y)
                 }
             }
@@ -327,7 +327,7 @@ impl Game {
     }
     // Returns the color, if there is one, at the specified x, y coordinates
     // Empty squares or invalid coordinates return None
-    fn get_color_at(&self, x: usize, y: usize) -> Option<Color> {
+    pub fn get_color_at(&self, x: usize, y: usize) -> Option<Color> {
         let index = 8 * y + x;
         let position : u64 = 0x80_00_00_00_00_00_00_00u64 >> index;
 
@@ -343,6 +343,8 @@ impl Game {
         None
     }
 
+    // Sets the color at the given numerical coordinates
+    // A value of None will mark the square as neither black or white (i.e. empty)
     fn set_color_at(&mut self, x: usize, y: usize, value : Option<Color>) -> () {
         let index = 8 * y + x;
         let position : u64 = 0x80_00_00_00_00_00_00_00u64 >> index;
@@ -366,17 +368,19 @@ impl Game {
         }
     }
 
-    // Sets the piece type for promotion. Piece type is supplied as a string
-    // Piece names must be supplied in english
-    pub fn set_promotion(&mut self, _piece: &str) -> () {
-        let mut _piece = _piece.to_ascii_lowercase();
-        self.promotion_piece = string_to_piece(&_piece);
+    // Sets the piece type for promotion.
+    pub fn set_promotion(&mut self, _piece: Piece) -> () {
+        if _piece != Piece::King {
+            self.promotion_piece = _piece;
+        }
+        else {
+            panic!("Can not promote to king!")
+        }
     }
 
-    pub fn get_game_state(&self) -> GameState{
-        self.state
-    }
-
+    // Takes a position in standard chess coordinates
+    // If starting position is valid, returns all possible moves as standard chess coordinates
+    // Else returns None
     pub fn get_possible_moves(&mut self, _position: &str) -> Option<Vec<String>> {
         let _position = string_to_coordinates(_position);
         let x = _position.0;
@@ -395,8 +399,17 @@ impl Game {
             None => {return None}
         }
     }
+    
+    pub fn get_game_state(&self) -> GameState{
+        self.state
+    }
+
+    pub fn get_board(&self) -> [[Option<Piece>; 8]; 8] {
+        return self.board;   
+    }
 }
 
+// Returns the opposite of the given color
 fn get_opposite_color(color : Color) -> Color {
     match color {
         Color::Black => {Color::White},
@@ -404,12 +417,13 @@ fn get_opposite_color(color : Color) -> Color {
     }
 }
 
+// Converts alphanumeric chess coordinates to numeric board coordinates
 fn string_to_coordinates(position: &str) -> (usize, usize) {
     let mut x = position.chars().nth(0).unwrap();
     x.make_ascii_uppercase();
     let x = usize::from((x as u8) - 65); // Turn x into an integer by casting char to u8 and removing the ASCII offset
 
-    let mut y = position.chars().nth(1).unwrap();
+    let y = position.chars().nth(1).unwrap();
     let y = usize::from(8 - (y as u8 - 48)); // Same as x, but subtract from 8 to uninvert y coordinate
 
     return (x, y)
@@ -423,18 +437,6 @@ fn coordinates_to_string(x: usize, y: usize) -> String {
     let y = u8::try_from(y).unwrap();
     let y = (8 - y + 48) as char;
     return String::from(x) + &String::from(y)
-}
-
-fn string_to_piece(string: &str) -> Piece {
-    match string {
-        "king" => {Piece::King},
-        "queen" => {Piece::Queen},
-        "rook" => {Piece::Rook},
-        "bishop" => {Piece::Bishop},
-        "knight" => {Piece::Knight},
-        "pawn" => {Piece::Pawn}
-        _ => {panic!("Invalid piece name!")},
-    }
 }
 
 // Creates a string representation of the current board
@@ -590,20 +592,105 @@ mod tests {
         }
     }
 
+    // Play a scholar's mate to demonstrate chessy behavior
+    #[test]
+    fn scholars_mate () {
+        let mut game = Game::new();
+        println!("{}", game);
+        assert!(game.make_move("E2", "E4") != None);
+        println!("{}", game);
+        assert!(game.make_move("E7", "E5") != None);
+        println!("{}", game);
+        assert!(game.make_move("D1", "H5") != None);
+        println!("{}", game);
+        assert!(game.make_move("B8", "C6") != None);
+        println!("{}", game);
+        assert!(game.make_move("F1", "C4") != None);
+        println!("{}", game);
+        assert!(game.make_move("G8", "F6") != None);
+        println!("{}", game);
+        assert!(game.make_move("H5", "F7") != None);
+        println!("{}", game);
+        assert!(game.get_game_state() == GameState::Checkmate)
+        
+    }
+
+    // Control that multiple pieces move as expected, and that the only valid moves are the ones that end a check
     #[test]
     fn possible_moves () {
-        let game = Game::new();
-        for y in 0..8 {
-            for x in 0..8 {
-                match game.board[y][x] {
-                    Some(piece) => {
-                        println!("Piece {:?} at ({}, {})", piece, x, y);
-                        println!("Possible moves: {:?}", piece.get_basic_moves(x, y, &game));
-                        println!("");
-                    },
-                    None => {},
-                } 
+        // Move a white pawn to check the black king and control that capturing works as expected
+        let mut game = Game::new();
+        game.move_piece(2, 6, 2, 2);
+        println!("{}", game);
+        assert!(game.get_possible_moves("C6") == Some(vec![String::from("D7"), String::from("B7")]));
+        assert!(game.make_move("C6", "D7") != None);
+        println!("{}", game);
+        assert!(game.state == GameState::Check);
+        // Control that the expected pieces can capture the pawn
+        assert!(game.get_possible_moves("B8") == Some(vec![String::from("D7")]));
+        assert!(game.get_possible_moves("C8") == Some(vec![String::from("D7")]));
+        assert!(game.get_possible_moves("D8") == Some(vec![String::from("D7")]));
+        assert!(game.get_possible_moves("D8") == Some(vec![String::from("D7")]));
+        // Control that the _only_ valid moves are the ones that end the check
+        let mut all_black_moves : Vec<String>;
+        all_black_moves = game.get_possible_moves("E8").unwrap();
+        for letter in ["A", "B", "C", "D", "E", "F", "G", "H"] {
+            for digit in ["7", "8"] {
+                let coordinates = String::from(letter) + digit;
+                if coordinates != String::from("D7") && coordinates != String::from("E8") {
+                    all_black_moves.append(&mut game.get_possible_moves(&coordinates).unwrap());
+                }
             }
         }
+        println!("Possible moves: {:?}", all_black_moves);
+        assert!(all_black_moves == vec![
+            String::from("D7"),
+            String::from("D7"),
+            String::from("D7"),
+            String::from("D7"),
+            ])
+    }
+
+    #[test]
+    fn promotion () {
+        let mut game = Game::new();
+        game.board = [
+            [None, None, None, None, None, None, None, Some(Piece::King)],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [Some(Piece::Pawn), Some(Piece::Pawn), Some(Piece::Pawn), Some(Piece::Pawn), Some(Piece::Pawn), Some(Piece::Pawn), Some(Piece::Pawn), Some(Piece::Pawn)],
+            [Some(Piece::Rook), Some(Piece::Knight), Some(Piece::Bishop), Some(Piece::Queen), Some(Piece::King), Some(Piece::Bishop), Some(Piece::Knight), Some(Piece::Rook)]
+        ];
+        game.black = 0x01_00_00_00_00_00_00_00;
+        assert!(game.make_move("A2", "A3") != None);
+        game.player = Color::White;
+        assert!(game.make_move("A3", "A4") != None);
+        game.player = Color::White;
+        assert!(game.make_move("A4", "A5") != None);
+        game.player = Color::White;
+        assert!(game.make_move("A5", "A6") != None);
+        game.player = Color::White;
+        assert!(game.make_move("A6", "A7") != None);
+        game.player = Color::White;
+        assert!(game.make_move("A7", "A8") != None);
+        assert!(game.board[0][0] == Some(Piece::Queen));
+
+        game.set_promotion(Piece::Knight);
+        game.player = Color::White;
+        assert!(game.make_move("B2", "B3") != None);
+        game.player = Color::White;
+        assert!(game.make_move("B3", "B4") != None);
+        game.player = Color::White;
+        assert!(game.make_move("B4", "B5") != None);
+        game.player = Color::White;
+        assert!(game.make_move("B5", "B6") != None);
+        game.player = Color::White;
+        assert!(game.make_move("B6", "B7") != None);
+        game.player = Color::White;
+        assert!(game.make_move("B7", "B8") != None);
+        assert!(game.board[0][1] == Some(Piece::Knight))
     }
 }
