@@ -1,7 +1,7 @@
 use std::fmt;
 
 // Stores piece types types to check moves/representation
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Piece {
     King,
     Queen,
@@ -14,8 +14,12 @@ enum Piece {
 impl Piece {
     // Returns a Vec of all legal moves excluding en passant and castling as coordinate tuples
     // Does not control for check/checkmate
-    pub fn get_basic_moves(&self, x : i32, y : i32, white : u64, black : u64) -> Vec<(i32, i32)> {
+    fn get_basic_moves(&self, x : usize, y : usize, game : &Game) -> Vec<(usize, usize)> {
         let mut moves = vec![(-1, -1)]; // Initialize moves to something that will be trimmed
+
+        // x and y could go negative during move calculation, temporarily convert to signed integers
+        let x = i32::try_from(x).unwrap();
+        let y = i32::try_from(y).unwrap();
         
         match self {
             Self::King => {
@@ -26,26 +30,26 @@ impl Piece {
                 ]
             },
             Self::Queen => {
-                moves.append(&mut self.get_moves_in_line(x, y, x, y + 7, black, white)); // South
-                moves.append(&mut self.get_moves_in_line(x, y, x, y - 7, black, white)); // North
-                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y, black, white)); // East
-                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y, black, white)); // West
-                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y + 7, black, white)); // Southeast
-                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y - 7, black, white)); // Northeast
-                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y + 7, black, white)); // Southwest
-                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y - 7, black, white)); // Northwest
+                moves.append(&mut self.get_moves_in_line(x, y, x, y + 7, game)); // South
+                moves.append(&mut self.get_moves_in_line(x, y, x, y - 7, game)); // North
+                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y, game)); // East
+                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y, game)); // West
+                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y + 7, game)); // Southeast
+                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y - 7, game)); // Northeast
+                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y + 7, game)); // Southwest
+                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y - 7, game)); // Northwest
             },
             Self::Rook => {
-                moves.append(&mut self.get_moves_in_line(x, y, x, y + 7, black, white)); // South
-                moves.append(&mut self.get_moves_in_line(x, y, x, y - 7, black, white)); // North
-                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y, black, white)); // East
-                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y, black, white)); // West
+                moves.append(&mut self.get_moves_in_line(x, y, x, y + 7, game)); // South
+                moves.append(&mut self.get_moves_in_line(x, y, x, y - 7, game)); // North
+                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y, game)); // East
+                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y, game)); // West
             },
             Self::Bishop => {
-                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y + 7, black, white)); // Southeast
-                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y - 7, black, white)); // Northeast
-                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y + 7, black, white)); // Southwest
-                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y - 7, black, white)); // Northwest
+                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y + 7, game)); // Southeast
+                moves.append(&mut self.get_moves_in_line(x, y, x + 7, y - 7, game)); // Northeast
+                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y + 7, game)); // Southwest
+                moves.append(&mut self.get_moves_in_line(x, y, x - 7, y - 7, game)); // Northwest
             },
             Self::Knight => {
                 moves = vec![
@@ -56,28 +60,38 @@ impl Piece {
                 ]
             },
             Self::Pawn => {
-                match get_color_at(x, y, black, white).unwrap() {
+                match game.get_color_at(usize::try_from(x).unwrap(),usize::try_from(y).unwrap()).unwrap() {
                     Color::Black => {
-                        moves.push((x, y + 1));
-                        if get_color_at(x + 1, y + 1, black, white) == Some(Color::White) {
+                        if game.get_color_at(usize::try_from(x).unwrap(), usize::try_from(y + 1).unwrap()) == None {
+                            moves.push((x, y + 1));
+                        }
+                        if game.get_color_at(usize::try_from(x + 1).unwrap(), usize::try_from(y + 1).unwrap()) == Some(Color::White) {
                             moves.push((x + 1, y + 1));
                         }
-                        if get_color_at(x - 1, y + 1, black, white) == Some(Color::White) {
-                            moves.push((x - 1, y + 1));
+                        if x > 0 {
+                            if game.get_color_at(usize::try_from(x - 1).unwrap(), usize::try_from(y + 1).unwrap()) == Some(Color::White) {
+                                moves.push((x - 1, y + 1));
+                            }
                         }
-                        if y == 1 {
+                        if y == 1 && game.get_color_at(usize::try_from(x).unwrap(), usize::try_from(y + 2).unwrap()) == None{
                             moves.push((x, y + 2));
                         }
                     },
                     Color::White => {
-                        moves.push((x, y - 1));
-                        if get_color_at(x + 1, y - 1, black, white) == Some(Color::Black) {
-                            moves.push((x + 1, y - 1));
+                        if game.get_color_at(usize::try_from(x).unwrap(), usize::try_from(y - 1).unwrap()) == None {
+                            moves.push((x, y - 1));
                         }
-                        if get_color_at(x - 1, y - 1, black, white) == Some(Color::Black) {
-                            moves.push((x - 1, y - 1));
+                        if y > 0 {
+                            if game.get_color_at(usize::try_from(x + 1).unwrap(), usize::try_from(y - 1).unwrap()) == Some(Color::Black) {
+                                moves.push((x + 1, y - 1));
+                            }
+                            if x > 0 {
+                                if game.get_color_at(usize::try_from(x - 1).unwrap(), usize::try_from(y - 1).unwrap()) == Some(Color::Black) {
+                                    moves.push((x - 1, y - 1));
+                                }
+                            }
                         }
-                        if y == 6 {
+                        if y == 6 && game.get_color_at(usize::try_from(x).unwrap(), usize::try_from(y - 2).unwrap()) == None{
                             moves.push((x, y - 2));
                         }
                     }
@@ -87,8 +101,11 @@ impl Piece {
         let moves = moves.into_iter()
                         // Make sure all moves are in bounds
                          .filter(|(a, b)| ((-1 < *a && *a < 8) && (-1 < *b && *b < 8)))
-                        //Remove all moves colliding with own color
-                         .filter(|(a, b)| get_color_at(*a, *b, black, white) != get_color_at(x, y, black, white)) 
+                         // Convert into usize
+                         .map(|(a, b)| (usize::try_from(a).unwrap(), usize::try_from(b).unwrap())) 
+                         //Remove all moves colliding with own color
+                         .filter(|(a, b)| game.get_color_at(*a, *b) != game.get_color_at(usize::try_from(x).unwrap(),
+                                                                                                              usize::try_from(y).unwrap()))
                          .collect();
         return moves;
     }
@@ -96,10 +113,10 @@ impl Piece {
     // Returns a list of all legal moves in a straight line from (x, y) to (target_x, target_y), stopping if interrupted by another piece
     // Checks for coordinates out of bounds, meaning target_x and target_y can safely be outside of the board
     // Diagonals _must_ have slope +/- 1
-    fn get_moves_in_line (&self, mut x : i32, mut y : i32, target_x : i32, target_y : i32, black : u64, white : u64) -> Vec<(i32, i32)> {
+    fn get_moves_in_line (&self, mut x : i32, mut y : i32, target_x : i32, target_y : i32, game : &Game) -> Vec<(i32, i32)> {
         let step_x = (target_x - x).signum();
         let step_y = (target_y - y).signum();
-        let own_color = get_color_at(x, y, black, white).unwrap();
+        let own_color = game.get_color_at(usize::try_from(x).unwrap(), usize::try_from(y).unwrap()).unwrap();
         let mut possible_moves = vec![(-1, -1)]; // Initialize possible moves to something that will get culled
 
         for i in 0..8 {
@@ -111,7 +128,7 @@ impl Piece {
                 break;
             }
 
-            match get_color_at(x, y, black, white) {
+            match game.get_color_at(usize::try_from(x).unwrap(),usize::try_from(y).unwrap()) {
                 Some(color) => {
                     if color != own_color {
                         possible_moves.push((x, y));
@@ -128,7 +145,7 @@ impl Piece {
 }
 
 // Game states
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum GameState {
     InProgress, // State during normal gameplay, allow any move
     Check, // King is in check, move out of check should be forced
@@ -136,7 +153,7 @@ pub enum GameState {
     Checkmate // Checkmate, award a win and end the game
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum Color {
     Black,
     White
@@ -151,6 +168,7 @@ pub struct Game {
     white: u64, // And the same for white pieces
     state: GameState,
     player: Color, // The player to move
+    promotion_piece : Piece // The piece type that pawns will promote to
 }
 
 impl Game {
@@ -171,32 +189,252 @@ impl Game {
             black: 0xFF_FF_00_00_00_00_00_00, // Sets top two rows to black
             white: 0x00_00_00_00_00_00_FF_FF, // And bottom two rows to white
             state: GameState::InProgress,
-            player: Color::White // White to move
+            player: Color::White, // White to move
+            promotion_piece: Piece::Queen
         }
     }
 
-    // pub fn make_move(&mut self, _from: &str, _to: &str) -> Option<GameState> {
-    //     match self.state {
-    //         GameState::InProgress => {
-    //             Some(self.state)
-    //         },
-    //         _ => {
-    //             None
-    //         }
-    //     }
-    // }
+    // Takes standard chess coordinates as inputs
+    // If the move is legal and the state allows:
+    // Makes the move, sets and returns the resulting game state, and advances the turn to the other player (if not checkmated)
+    // Any illegal move returns None
+    pub fn make_move(&mut self, _from: &str, _to: &str) -> Option<GameState> {
+        let numerical_from = string_to_coordinates(_from);
+        let numerical_to = string_to_coordinates(_to);
+        // First check that the move is allowed, if not exit early and return None
+        // Exit if game state prohibits moving
+        if !(self.state == GameState::InProgress || self.state == GameState::Check) {
+            return None;
+        }
+        // Exit if attempting to move out of turn
+        if self.get_color_at(numerical_from.0, numerical_from.1) != Some(self.player) {
+            return None;
+        }
+        let moves = self.get_possible_moves(_from);
+        // Exit if start position is invalid
+        if moves == None {
+            return None;
+        }
+        let moves = moves.unwrap();
+        // Exit if end position is invalid
+        if !moves.contains(&String::from(_to)) {
+            return None;
+        }
+        // We now know that the move is legal, proceed from there
+        self.move_piece(numerical_from.0, numerical_from.0, numerical_to.0, numerical_to.1);
+        let opponent = get_opposite_color(self.player);
+        if self.is_in_check(opponent) {
+            if self.has_no_moves(opponent) {
+                self.state = GameState::Checkmate;
+            }
+            else {
+                self.state = GameState::Check
+            }
+        }
+        else {
+            self.state = GameState::InProgress;
+        }
+        self.player = opponent; // Turn is over, swap player
+        return Some(self.state);
+    }
 
-    // pub fn set_promotion(&mut self, _piece: &str) -> () {
+    // Moves piece without checks, will panic at an invalid move
+    // Replaces whatever is at the end position, meaning captures happen automatically
+    // Promotes pawns if they reach the end of the board
+    fn move_piece(&mut self, start_x : usize, start_y : usize, end_x : usize, end_y : usize) -> () {
+        let piece = self.board[start_y][start_x].clone().unwrap();
+        let color = self.get_color_at(start_x, start_y).unwrap();
+        self.board[start_y][start_x] = None;
+        self.set_color_at(start_x, start_y, None);
+        self.board[end_y][end_x] = Some(piece);
+        self.set_color_at(end_x, end_y, Some(color));
+        // Start check for promotion
+        if piece != Piece::Pawn {
+            return
+        }
+        match color {
+            Color::Black => {
+                if end_y == 7 {
+                    self.board[end_y][end_x] = Some(self.promotion_piece);
+                }
+            },
+            Color::White => {
+                if end_y == 0 {
+                    self.board[end_y][end_x] = Some(self.promotion_piece);
+                }
+            }
+        }
+    }
 
-    // }
+    // If any moves for the given color are possible, return false
+    // Else return true
+    fn has_no_moves(&mut self, color : Color) -> bool {
+        for y in 0..8 {
+            for x in 0..8 {
+                if self.get_color_at(x, y) == Some(color) {
+                    let moves = self.get_possible_moves(&coordinates_to_string(x, y)).unwrap();
+                    if moves.len() > 0 {return false };
+                }
+            }
+        }
+        return true
+    }
 
-    // pub fn get_game_state(&self) -> GameState{
-    //     self.state
-    // }
+    // Simulates a move and restores the board, returns true if the move would put color in check, otherwise false 
+    fn in_check_after_move(&mut self, start_x: usize, start_y : usize, end_x : usize, end_y : usize, color : Color) -> bool {
+        let original_board = self.board.clone();
+        let original_black = self.black;
+        let original_white = self.white;
+        self.move_piece(start_x, start_y, end_x, end_y);
+        let in_check = self.is_in_check(color);
+        self.board = original_board;
+        self.black = original_black;
+        self.white = original_white;
+        return in_check
+    }
 
-//     pub fn get_possible_moves(&self, _position: &str) -> Option<Vec<String>> {
+    // Returns whether the king of specified color at specified coordinates is in check
+    // Takes coordinates and color separately to be able to predict check for future position
+    fn is_in_check(&self, color : Color) -> bool {
+        let opposite_color = get_opposite_color(color);
+        let mut all_opponent_moves : Vec<(usize, usize)> = vec![(0, 0)]; // Initialize to value that will be trimmed
+        for y in 0..8 {
+            for x in 0..8 {
+                match self.board[y][x] {
+                    Some(piece) => {
+                        if self.get_color_at(x, y).unwrap() == opposite_color {
+                            all_opponent_moves.append(&mut piece.get_basic_moves(x, y, self));
+                        }
+                    },
+                    None => {},
+                }
+            }
+        }
+        all_opponent_moves.swap_remove(0); // Trim initialization value
+        return all_opponent_moves.contains(&self.find_king(&color))
+    }
 
-//    }
+    // Returns the coordinates of the king of the specified color
+    fn find_king(&self, color: &Color) -> (usize, usize) {
+        for y in 0..8 {
+            for x in 0..8 {
+                if self.board[y][x] == Some(Piece::King) && self.get_color_at(x, y) == Some(*color) {
+                    return (x, y)
+                }
+            }
+        }
+        panic!("King not found!");
+    }
+    // Returns the color, if there is one, at the specified x, y coordinates
+    // Empty squares or invalid coordinates return None
+    fn get_color_at(&self, x: usize, y: usize) -> Option<Color> {
+        let index = 8 * y + x;
+        let position : u64 = 0x80_00_00_00_00_00_00_00u64 >> index;
+
+        match position & self.black {
+            0 => {},
+            _ => {return Some(Color::Black)}
+        }
+
+        match position & self.white {
+            0 => {},
+            _ => {return Some(Color::White);}
+        }
+        None
+    }
+
+    fn set_color_at(&mut self, x: usize, y: usize, value : Option<Color>) -> () {
+        let index = 8 * y + x;
+        let position : u64 = 0x80_00_00_00_00_00_00_00u64 >> index;
+        match value {
+            Some(color) => {
+                match color {
+                    Color::Black => {
+                        self.black = self.black | position; // set the bit at position to 1
+                        self.white = self.white & !position; // set the bit at position to 0
+                    },
+                    Color::White => {
+                        self.black = self.black & !position;
+                        self.white = self.white | position;
+                    }
+                }
+            },
+            None => {
+                self.black = self.black & !position;
+                self.white = self.white & !position;
+            },
+        }
+    }
+
+    // Sets the piece type for promotion. Piece type is supplied as a string
+    // Piece names must be supplied in english
+    pub fn set_promotion(&mut self, _piece: &str) -> () {
+        let mut _piece = _piece.to_ascii_lowercase();
+        self.promotion_piece = string_to_piece(&_piece);
+    }
+
+    pub fn get_game_state(&self) -> GameState{
+        self.state
+    }
+
+    pub fn get_possible_moves(&mut self, _position: &str) -> Option<Vec<String>> {
+        let _position = string_to_coordinates(_position);
+        let x = _position.0;
+        let y = _position.1;
+        match self.board[y][x] {
+            Some(piece) => {
+                let color = self.get_color_at(x, y).unwrap();
+                let moves = piece.get_basic_moves(x, y, self);
+                let moves = moves
+                                                .into_iter()
+                                                .filter(|(to_x, to_y)| !self.in_check_after_move(x, y, *to_x, *to_y, color))
+                                                .map(|(to_x, to_y)| coordinates_to_string(to_x, to_y))
+                                                .collect::<Vec<String>>();
+                return Some(moves);
+            },
+            None => {return None}
+        }
+    }
+}
+
+fn get_opposite_color(color : Color) -> Color {
+    match color {
+        Color::Black => {Color::White},
+        Color::White => {Color::Black}
+    }
+}
+
+fn string_to_coordinates(position: &str) -> (usize, usize) {
+    let mut x = position.chars().nth(0).unwrap();
+    x.make_ascii_uppercase();
+    let x = usize::from((x as u8) - 65); // Turn x into an integer by casting char to u8 and removing the ASCII offset
+
+    let mut y = position.chars().nth(1).unwrap();
+    let y = usize::from(8 - (y as u8 - 48)); // Same as x, but subtract from 8 to uninvert y coordinate
+
+    return (x, y)
+}
+
+// Returns a string representation of numeric board coordinates
+fn coordinates_to_string(x: usize, y: usize) -> String {
+    let x = u8::try_from(x).unwrap();
+    let x = (x + 65) as char;
+
+    let y = u8::try_from(y).unwrap();
+    let y = (8 - y + 48) as char;
+    return String::from(x) + &String::from(y)
+}
+
+fn string_to_piece(string: &str) -> Piece {
+    match string {
+        "king" => {Piece::King},
+        "queen" => {Piece::Queen},
+        "rook" => {Piece::Rook},
+        "bishop" => {Piece::Bishop},
+        "knight" => {Piece::Knight},
+        "pawn" => {Piece::Pawn}
+        _ => {panic!("Invalid piece name!")},
+    }
 }
 
 // Creates a string representation of the current board
@@ -233,24 +471,8 @@ impl fmt::Display for Game {
         .collect::<Vec<String>>()
         .join("\n");
         
-        write!(f, "{}", output)
+        write!(f, "{}\nBlack bits: {:0>64b}\nWhite bits: {:0>64b}", output, self.black, self.white)
     }
-}
-
-fn get_color_at(x: i32, y: i32, black: u64, white: u64) -> Option<Color> {
-    let index = 8 * y + x;
-    let position : u64 = 0x80_00_00_00_00_00_00_00u64 >> index;
-
-    match position & black {
-        0 => {},
-        _ => {return Some(Color::Black)}
-    }
-
-    match position & white {
-        0 => {},
-        _ => {return Some(Color::White);}
-    }
-    None
 }
 
 #[cfg(test)]
@@ -264,15 +486,119 @@ mod tests {
     }
 
     #[test]
+    fn set_color() {
+        let mut game = Game::new();
+        for y in 0..8 {
+            for x in 0..8 {
+                game.set_color_at(x, y, None);
+                if x % 2 == 0 {
+                    game.set_color_at(x, y, Some(Color::Black));
+                }
+                else {
+                    game.set_color_at(x, y, Some(Color::White));
+                }
+            }
+        }
+        println!("{}", game)
+    }
+
+    #[test]
+    fn in_check() {
+        let mut game = Game::new();
+        game.board = [
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, Some(Piece::King), None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, Some(Piece::Pawn), None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+        ];
+        game.black = 0x00_00_10_00_00_00_00_00;
+        game.white = 0x00_00_00_00_20_00_00_00;
+        println!("{}", game);
+        assert!(!game.is_in_check(Color::Black));
+        game.move_piece(2, 4, 2, 3);
+        println!("{}", game);
+        assert!(game.is_in_check(Color::Black));
+    }
+
+    #[test]
+    fn checkmated() {
+        let mut game = Game::new();
+        game.board = [
+            [Some(Piece::Rook), None, None, Some(Piece::King), None, None, None, None],
+            [Some(Piece::Rook), None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+        ];
+        game.black = 0x10_00_00_00_00_00_00_00;
+        game.white = 0x80_80_00_00_00_00_00_00;
+        println!("{}", game);
+        assert!(game.is_in_check(Color::Black));
+        assert!(game.has_no_moves(Color::Black));
+        game.move_piece(0, 1, 0, 4);
+        println!("{}", game);
+        assert!(!game.has_no_moves(Color::Black));
+    }
+
+    #[test]
+    fn check_after_move() {
+        let mut game = Game::new();
+        game.board = [
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, Some(Piece::King), None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, Some(Piece::Pawn), None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+            [None, None, None, None, None, None, None, None],
+        ];
+        game.black = 0x00_00_10_00_00_00_00_00;
+        game.white = 0x00_00_00_00_20_00_00_00;
+        println!("{}", game);
+        assert!(!game.is_in_check(Color::Black));
+        assert!(game.in_check_after_move(2, 4, 2, 3, Color::Black));
+        let moves = game.get_possible_moves("D6").unwrap();
+        println!("{:?}", moves)
+
+    }
+
+    #[test]
+    fn string_conversion() {
+        let mut counter_x = 0;
+        for letter in ["A", "B", "C", "D", "E", "F", "G", "H"] {
+            let mut counter_y = 8;
+            for digit in ["1", "2", "3", "4", "5", "6", "7", "8"] {
+                counter_y -= 1;
+                let coordinates = String::from(letter) + digit;
+                println!("Before conversion: {}", coordinates);
+                let coordinates = string_to_coordinates(&coordinates);
+                println!("After conversion to number: {:?}", coordinates);
+                assert!(coordinates == (counter_x, counter_y));
+                let coordinates = coordinates_to_string(coordinates.0, coordinates.1);
+                println!("After conversion back to string: {}", coordinates);
+                assert!(coordinates == String::from(letter) + digit);
+            }
+            counter_x += 1;
+        }
+    }
+
+    #[test]
     fn possible_moves () {
         let game = Game::new();
         for y in 0..8 {
-            println!("{y}");
             for x in 0..8 {
                 match game.board[y][x] {
                     Some(piece) => {
                         println!("Piece {:?} at ({}, {})", piece, x, y);
-                        println!("Possible moves: {:?}", piece.get_basic_moves(i32::try_from(x).unwrap(),i32::try_from(y).unwrap(), game.white, game.black));
+                        println!("Possible moves: {:?}", piece.get_basic_moves(x, y, &game));
                         println!("");
                     },
                     None => {},
