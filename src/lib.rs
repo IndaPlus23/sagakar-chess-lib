@@ -1,7 +1,7 @@
 use std::fmt;
 
 // Chess pieces for use in game logic and display
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Piece {
     King,
     Queen,
@@ -145,7 +145,7 @@ impl Piece {
 }
 
 // Game states
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameState {
     InProgress, // State during normal gameplay
     Check, // King is in check
@@ -154,7 +154,7 @@ pub enum GameState {
 }
 
 // Colors for use in movement, turn-taking and display logic
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub enum Color {
     Black,
     White
