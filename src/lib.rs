@@ -418,7 +418,7 @@ fn get_opposite_color(color : Color) -> Color {
 }
 
 // Converts alphanumeric chess coordinates to numeric board coordinates
-fn string_to_coordinates(position: &str) -> (usize, usize) {
+pub fn string_to_coordinates(position: &str) -> (usize, usize) {
     let mut x = position.chars().nth(0).unwrap();
     x.make_ascii_uppercase();
     let x = usize::from((x as u8) - 65); // Turn x into an integer by casting char to u8 and removing the ASCII offset
@@ -430,7 +430,7 @@ fn string_to_coordinates(position: &str) -> (usize, usize) {
 }
 
 // Returns a string representation of numeric board coordinates
-fn coordinates_to_string(x: usize, y: usize) -> String {
+pub fn coordinates_to_string(x: usize, y: usize) -> String {
     let x = u8::try_from(x).unwrap();
     let x = (x + 65) as char;
 
