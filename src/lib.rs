@@ -409,7 +409,11 @@ impl Game {
     }
 
     pub fn get_board(&self) -> [[Option<Piece>; 8]; 8] {
-        return self.board;   
+        self.board
+    }
+
+    pub fn get_promotion_type(&self) -> Piece {
+        self.promotion_piece
     }
 }
 
