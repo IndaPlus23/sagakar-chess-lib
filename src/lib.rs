@@ -399,6 +399,10 @@ impl Game {
             None => {return None}
         }
     }
+
+    pub fn get_player(&self) -> Color {
+        self.player
+    }
     
     pub fn get_game_state(&self) -> GameState{
         self.state
